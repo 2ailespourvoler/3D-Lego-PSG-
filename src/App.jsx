@@ -5,6 +5,7 @@ import Player from './Player'
 import Joystick from './Joystick'
 import Coins from './Coins'
 import Stadium from './Stadium'
+import Ball from './Ball'
 
 const isTouch = typeof window !== 'undefined' && 'ontouchstart' in window
 
@@ -72,8 +73,11 @@ export default function App() {
           {/* Le stade : terrain, lignes, gradins, public, murs */}
           <Stadium />
 
+          {/* Le ballon : le joueur le pousse en le percutant */}
+          <Ball key={`ball-${startRef.current}`} />
+
           <Suspense fallback={null}>
-            <Player />
+            <Player key={`player-${startRef.current}`} />
           </Suspense>
 
           {phase === 'playing' && (

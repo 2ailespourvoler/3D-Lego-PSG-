@@ -96,7 +96,7 @@ export default function Player() {
   })
 
   return (
-    <RigidBody ref={body} colliders={false} mass={1} lockRotations position={[0, 1, 0]}>
+    <RigidBody ref={body} colliders={false} mass={1} lockRotations position={[-2.5, 1, 0]}>
       <CuboidCollider args={[0.5, 0.5, 0.5]} />
       <group ref={visual}>
         <primitive object={scene} scale={MODEL_SCALE} position={[0, groundY, 0]} />
