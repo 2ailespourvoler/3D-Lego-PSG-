@@ -312,7 +312,7 @@ function Ads({ hx, hz }) {
       {/* Côté lointain (-z) */}
       <Board url="/ads/pub1.png" center={[0, 0, -(hz + 1)]} length={long} rotationY={0} color="#c2185b" />
       {/* Côté proche (+z), derrière la caméra */}
-      <Board url="/ads/pub1.png" center={[0, 0, hz + 1]} length={long} rotationY={Math.PI} color="#c2185b" />
+      <Board url="/ads/pub4.png" center={[0, 0, hz + 1]} length={long} rotationY={Math.PI} color="#6a1b9a" />
       {/* Bout droit (+x) */}
       <Board url="/ads/pub2.png" center={[hx + 1, 0, 0]} length={endLen} rotationY={-Math.PI / 2} color="#d32f2f" />
       {/* Bout gauche (-x) */}

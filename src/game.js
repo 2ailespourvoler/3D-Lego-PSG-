@@ -2,18 +2,15 @@
 
 export const PITCH = { hx: 22, hz: 15 }
 
+// Ligne de but (alignée sur la texture du terrain) + dimensions de la cage
+export const GOAL = {
+  lineX: PITCH.hx - (28 / 1024) * (PITCH.hx * 2),
+  width: 7,
+  height: 2.4,
+}
+
+// Position du joueur 1 (suivi caméra en mode Solo)
 export const playerPos = { x: 0, y: 0, z: 0 }
 
-// Référence vers le corps physique du ballon (pour le frapper depuis le joueur).
+// Corps physique du ballon (pour le frapper)
 export const ballStore = { body: null }
-
-export function randomCoinPos() {
-  const mx = PITCH.hx - 3
-  const mz = PITCH.hz - 3
-  let x, z
-  do {
-    x = (Math.random() * 2 - 1) * mx
-    z = (Math.random() * 2 - 1) * mz
-  } while (Math.abs(x) < 2 && Math.abs(z) < 2)
-  return [x, z]
-}

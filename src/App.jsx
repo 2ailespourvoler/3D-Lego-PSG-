@@ -1,68 +1,117 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { Physics, RigidBody } from '@react-three/rapier'
+import * as THREE from 'three'
 import Player from './Player'
-import Joystick from './Joystick'
-import Coins from './Coins'
-import Stadium from './Stadium'
 import Ball from './Ball'
+import Stadium from './Stadium'
+import { input1, input2 } from './input'
+import { playerPos, ballStore, GOAL, PITCH } from './game'
 
-const isTouch = typeof window !== 'undefined' && 'ontouchstart' in window
+const MATCH_TIME = 120 // secondes (2 min)
 
-const TOTAL_COINS = 8   // mode "tout ramasser"
-const TIMED_COINS = 5   // pièces simultanées en mode chrono
-const TIME_LIMIT = 30   // secondes (mode temps limité)
+// Caméra : suit le joueur en Solo, vue large fixe en Duel
+function CameraRig({ mode }) {
+  const target = useRef(new THREE.Vector3())
+  const desired = useRef(new THREE.Vector3())
+  useFrame((state, delta) => {
+    if (mode === 'solo') {
+      target.current.set(playerPos.x, playerPos.y, playerPos.z)
+      desired.current.copy(target.current).add(new THREE.Vector3(0, 6, 10))
+    } else {
+      desired.current.set(0, 31, 33)
+      target.current.set(0, 0, 0)
+    }
+    const s = 1 - Math.pow(0.0015, delta)
+    state.camera.position.lerp(desired.current, s)
+    state.camera.lookAt(target.current)
+  })
+  return null
+}
+
+// Détecte un but : le ballon franchit la ligne dans la largeur de la cage
+function GoalSensor({ active, onGoal }) {
+  const last = useRef(0)
+  useFrame(() => {
+    if (!active) return
+    const ball = ballStore.body
+    if (!ball) return
+    const now = performance.now()
+    if (now - last.current < 2000) return
+    const t = ball.translation()
+    if (Math.abs(t.z) < GOAL.width / 2 - 0.2 && t.y < 2.3) {
+      if (t.x > GOAL.lineX + 0.2) { last.current = now; onGoal(1) }       // cage +x : J1 marque
+      else if (t.x < -GOAL.lineX - 0.2) { last.current = now; onGoal(2) }  // cage -x : J2 marque
+    }
+  })
+  return null
+}
+
+function fmt(s) {
+  const m = Math.floor(s / 60)
+  const r = Math.floor(s % 60)
+  return `${m}:${r.toString().padStart(2, '0')}`
+}
 
 export default function App() {
-  const [phase, setPhase] = useState('menu')   // 'menu' | 'playing' | 'over'
-  const [mode, setMode] = useState('collect')  // 'collect' | 'timed'
-  const [score, setScore] = useState(0)
-  const [time, setTime] = useState(0)
-  const startRef = useRef(0)
-  const scoreRef = useRef(0)
+  const [mode, setMode] = useState('duel')      // 'solo' | 'duel'
+  const [phase, setPhase] = useState('menu')     // 'menu' | 'playing' | 'over'
+  const [s1, setS1] = useState(0)
+  const [s2, setS2] = useState(0)
+  const [time, setTime] = useState(MATCH_TIME)
+  const [goalBy, setGoalBy] = useState(null)     // null | 1 | 2  (fenêtre "BUT !")
+  const [token, setToken] = useState(0)          // change -> replace ballon + joueurs
 
-  function startGame(selectedMode) {
-    setMode(selectedMode)
-    setScore(0)
-    scoreRef.current = 0
-    startRef.current = performance.now()
-    setTime(selectedMode === 'timed' ? TIME_LIMIT : 0)
+  const r1 = useRef(0)
+  const r2 = useRef(0)
+  const goalTimer = useRef(null)
+
+  function startGame(m) {
+    setMode(m)
+    setS1(0); setS2(0); r1.current = 0; r2.current = 0
+    setTime(MATCH_TIME)
+    setGoalBy(null)
+    setToken((t) => t + 1)
     setPhase('playing')
   }
 
+  // Chrono (en pause pendant la fenêtre "BUT !")
   useEffect(() => {
     if (phase !== 'playing') return
     const id = setInterval(() => {
-      const elapsed = (performance.now() - startRef.current) / 1000
-      if (mode === 'timed') {
-        const remaining = Math.max(0, TIME_LIMIT - elapsed)
-        setTime(remaining)
-        if (remaining <= 0) setPhase('over')
-      } else {
-        setTime(elapsed)
-      }
+      setTime((prev) => {
+        if (goalBy !== null) return prev
+        const next = prev - 0.1
+        if (next <= 0) { setPhase('over'); return 0 }
+        return next
+      })
     }, 100)
     return () => clearInterval(id)
-  }, [phase, mode])
+  }, [phase, goalBy])
 
-  function handleCollect() {
-    scoreRef.current += 1
-    setScore(scoreRef.current)
-    if (mode === 'collect' && scoreRef.current >= TOTAL_COINS) {
-      setPhase('over')
-    }
+  function handleGoal(team) {
+    if (team === 1) { r1.current += 1; setS1(r1.current) }
+    else { r2.current += 1; setS2(r2.current) }
+    setGoalBy(team)
+    setToken((t) => t + 1) // ballon au centre, joueurs replacés
+    if (goalTimer.current) clearTimeout(goalTimer.current)
+    goalTimer.current = setTimeout(() => setGoalBy(null), 1800)
   }
 
-  const coinsKey = `${mode}-${startRef.current}`
+  useEffect(() => () => { if (goalTimer.current) clearTimeout(goalTimer.current) }, [])
+
+  const frozen = goalBy !== null
+  const half = PITCH.hx * 0.4
 
   return (
     <>
-      <Canvas shadows camera={{ position: [0, 6, 10], fov: 50 }}>
+      <Canvas shadows camera={{ position: [0, 31, 33], fov: 50 }}>
         <ambientLight intensity={0.7} />
-        <directionalLight position={[5, 12, 5]} intensity={1.2} castShadow shadow-mapSize={[1024, 1024]} />
+        <directionalLight position={[5, 14, 5]} intensity={1.2} castShadow shadow-mapSize={[1024, 1024]} />
+
+        <CameraRig mode={phase === 'playing' ? mode : 'duel'} />
 
         <Physics>
-          {/* Sol de base (sous le terrain) */}
           <RigidBody type="fixed" colliders="cuboid">
             <mesh position={[0, -0.5, 0]} receiveShadow>
               <boxGeometry args={[70, 1, 60]} />
@@ -70,59 +119,92 @@ export default function App() {
             </mesh>
           </RigidBody>
 
-          {/* Le stade : terrain, lignes, gradins, public, murs */}
           <Stadium />
 
-          {/* Le ballon : le joueur le pousse en le percutant */}
-          <Ball key={`ball-${startRef.current}`} />
-
-          <Suspense fallback={null}>
-            <Player key={`player-${startRef.current}`} />
-          </Suspense>
-
           {phase === 'playing' && (
-            <Coins
-              key={coinsKey}
-              count={mode === 'timed' ? TIMED_COINS : TOTAL_COINS}
-              mode={mode}
-              onCollect={handleCollect}
-            />
+            <>
+              <Ball key={`ball-${token}`} />
+
+              <Suspense fallback={null}>
+                <Player
+                  key={`p1-${token}`}
+                  source={input1}
+                  spawn={mode === 'solo' ? [-2.5, 1, 0] : [-half, 1, 0]}
+                  markerColor="#2b6cff"
+                  reportPos
+                  frozen={frozen}
+                />
+              </Suspense>
+
+              {mode === 'duel' && (
+                <Suspense fallback={null}>
+                  <Player
+                    key={`p2-${token}`}
+                    source={input2}
+                    spawn={[half, 1, 0]}
+                    markerColor="#e8412c"
+                    frozen={frozen}
+                  />
+                </Suspense>
+              )}
+
+              <GoalSensor active={!frozen} onGoal={handleGoal} />
+            </>
           )}
         </Physics>
       </Canvas>
 
-      {isTouch && <Joystick />}
-
+      {/* Tableau d'affichage */}
       {phase === 'playing' && (
         <div className="hud">
-          <div className="hud-pill">🪙 {score}{mode === 'collect' ? ` / ${TOTAL_COINS}` : ''}</div>
-          <div className="hud-pill">⏱️ {time.toFixed(1)}s</div>
+          {mode === 'duel' ? (
+            <div className="hud-pill score">
+              <span className="t1">Bleu</span> {s1} <span className="sep">-</span> {s2} <span className="t2">Rouge</span>
+            </div>
+          ) : (
+            <div className="hud-pill">⚽ Buts : {s1}</div>
+          )}
+          <div className="hud-pill">⏱️ {fmt(time)}</div>
         </div>
       )}
 
+      {/* Fenêtre "BUT !" */}
+      {phase === 'playing' && goalBy && (
+        <div className="goal-flash">
+          <div className={goalBy === 1 ? 'goal-text t1' : 'goal-text t2'}>BUT !</div>
+        </div>
+      )}
+
+      {/* Menu */}
       {phase === 'menu' && (
         <div className="overlay">
           <div className="panel">
-            <h1>Ramasse les pièces !</h1>
-            <button onClick={() => startGame('collect')}>
-              🎯 Toutes les pièces, le plus vite possible
-            </button>
-            <button onClick={() => startGame('timed')}>
-              ⏱️ Un maximum en {TIME_LIMIT} secondes
-            </button>
+            <h1>⚽ Foot Lego</h1>
+            <button onClick={() => startGame('solo')}>Solo (entraînement)</button>
+            <button onClick={() => startGame('duel')}>Duel — 2 joueurs</button>
+            <p className="hint-controls">
+              J1 : flèches + Entrée (ou manette + A)<br />
+              J2 : ZQSD/WASD + Espace
+            </p>
           </div>
         </div>
       )}
 
+      {/* Fin de match */}
       {phase === 'over' && (
         <div className="overlay">
           <div className="panel">
-            <h1>{mode === 'collect' ? 'Gagné ! 🎉' : 'Temps écoulé !'}</h1>
-            <p className="result">
-              {mode === 'collect'
-                ? `Ton temps : ${time.toFixed(1)}s`
-                : `Pièces ramassées : ${score}`}
-            </p>
+            {mode === 'duel' ? (
+              <>
+                <h1>{s1 > s2 ? 'Joueur Bleu gagne ! 🎉' : s2 > s1 ? 'Joueur Rouge gagne ! 🎉' : 'Match nul'}</h1>
+                <p className="result">{s1} - {s2}</p>
+              </>
+            ) : (
+              <>
+                <h1>Fin du match</h1>
+                <p className="result">Tu as marqué {s1} but{s1 > 1 ? 's' : ''} !</p>
+              </>
+            )}
             <button onClick={() => setPhase('menu')}>Rejouer</button>
           </div>
         </div>

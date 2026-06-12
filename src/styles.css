@@ -110,3 +110,41 @@ body {
   background: rgba(255, 255, 255, 0.7);
   transition: transform 0.05s linear;
 }
+
+/* Tableau de score (Duel) */
+.hud-pill.score { display: flex; align-items: center; gap: 8px; }
+.hud-pill .t1 { color: #6aa6ff; font-weight: 700; }
+.hud-pill .t2 { color: #ff8a7a; font-weight: 700; }
+.hud-pill .sep { opacity: 0.6; }
+
+/* Fenêtre "BUT !" */
+.goal-flash {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.goal-text {
+  font-size: 84px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: #fff;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  animation: goalpop 0.4s ease-out;
+}
+.goal-text.t1 { color: #5b9bff; }
+.goal-text.t2 { color: #ff6a55; }
+@keyframes goalpop {
+  0% { transform: scale(0.4); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Aide commandes dans le menu */
+.hint-controls {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #555;
+}
