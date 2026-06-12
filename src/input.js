@@ -1,50 +1,55 @@
-// Entrées de déplacement : clavier, joystick tactile ET manette (Xbox, etc.).
-export const input = { x: 0, z: 0 };
+// Entrées : clavier, joystick tactile, manette. + coup de pied (bouton A / Espace).
+export const input = { x: 0, z: 0, kickRequested: false }
 
-const keys = {};
-const DEADZONE = 0.2; // zone morte du stick, pour ignorer les micro-mouvements
+const keys = {}
+const DEADZONE = 0.2
 
 function updateFromKeyboard() {
-  let x = 0;
-  let z = 0;
-  if (keys['ArrowUp'] || keys['KeyW'] || keys['KeyZ']) z -= 1; // avancer
-  if (keys['ArrowDown'] || keys['KeyS']) z += 1; // reculer
-  if (keys['ArrowLeft'] || keys['KeyA'] || keys['KeyQ']) x -= 1; // gauche
-  if (keys['ArrowRight'] || keys['KeyD']) x += 1; // droite
-  input.x = x;
-  input.z = z;
+  let x = 0
+  let z = 0
+  if (keys['ArrowUp'] || keys['KeyW'] || keys['KeyZ']) z -= 1
+  if (keys['ArrowDown'] || keys['KeyS']) z += 1
+  if (keys['ArrowLeft'] || keys['KeyA'] || keys['KeyQ']) x -= 1
+  if (keys['ArrowRight'] || keys['KeyD']) x += 1
+  input.x = x
+  input.z = z
 }
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    keys[e.code] = true;
-    updateFromKeyboard();
-  });
+    keys[e.code] = true
+    if (e.code === 'Space' && !e.repeat) input.kickRequested = true // coup de pied au clavier
+    updateFromKeyboard()
+  })
   window.addEventListener('keyup', (e) => {
-    keys[e.code] = false;
-    updateFromKeyboard();
-  });
+    keys[e.code] = false
+    updateFromKeyboard()
+  })
 
-  // --- Manette de jeu (API Gamepad) : on lit le stick gauche ---
-  let padWasActive = false;
+  // --- Manette ---
+  let padWasActive = false
+  let kickWas = false
   function pollGamepad() {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let active = false;
+    const pads = navigator.getGamepads ? navigator.getGamepads() : []
+    let active = false
     for (const pad of pads) {
-      if (!pad) continue;
-      const gx = pad.axes[0] || 0; // stick gauche, horizontal
-      const gz = pad.axes[1] || 0; // stick gauche, vertical
+      if (!pad) continue
+      const gx = pad.axes[0] || 0
+      const gz = pad.axes[1] || 0
       if (Math.abs(gx) > DEADZONE || Math.abs(gz) > DEADZONE) {
-        input.x = gx;
-        input.z = gz;
-        active = true;
+        input.x = gx
+        input.z = gz
+        active = true
       }
-      break; // on n'utilise que la première manette branchée
+      // Bouton A (index 0) = coup de pied, déclenché à l'appui
+      const kick = !!(pad.buttons[0] && pad.buttons[0].pressed)
+      if (kick && !kickWas) input.kickRequested = true
+      kickWas = kick
+      break
     }
-    // Quand on relâche le stick, on rend la main au clavier
-    if (!active && padWasActive) updateFromKeyboard();
-    padWasActive = active;
-    requestAnimationFrame(pollGamepad);
+    if (!active && padWasActive) updateFromKeyboard()
+    padWasActive = active
+    requestAnimationFrame(pollGamepad)
   }
-  requestAnimationFrame(pollGamepad);
+  requestAnimationFrame(pollGamepad)
 }

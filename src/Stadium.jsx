@@ -86,24 +86,110 @@ function buildCrowd(hx, hz) {
   return { steps, bodies, heads }
 }
 
+// Texture de filet : grille blanche qui se répète
+let _netTex = null
+function getNetTexture() {
+  if (_netTex) return _netTex
+  const s = 64
+  const cv = document.createElement('canvas')
+  cv.width = s
+  cv.height = s
+  const ctx = cv.getContext('2d')
+  ctx.clearRect(0, 0, s, s)
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+  ctx.lineWidth = 6
+  ctx.strokeRect(0, 0, s, s)
+  const tex = new THREE.CanvasTexture(cv)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  _netTex = tex
+  return tex
+}
+
+function quadGeom(p0, p1, p2, p3, uRep, vRep) {
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([...p0, ...p1, ...p2, ...p0, ...p2, ...p3]), 3))
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, uRep, 0, uRep, vRep, 0, 0, uRep, vRep, 0, vRep]), 2))
+  g.computeVertexNormals()
+  return g
+}
+
+function triGeom(p0, p1, p2, uRep, vRep) {
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([...p0, ...p1, ...p2]), 3))
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, uRep, 0, 0, vRep]), 2))
+  g.computeVertexNormals()
+  return g
+}
+
 function Goal({ lineX }) {
   const postH = 2.4
   const goalW = 7
+  const w = goalW / 2
+  const netDepth = 1.5
+  const outDir = Math.sign(lineX) || 1
+  const cell = 0.3
+  const slopeLen = Math.hypot(netDepth, postH)
+  const netTex = getNetTexture()
+
+  const geoms = useMemo(() => {
+    const back = quadGeom(
+      [0, postH, w], [0, postH, -w], [outDir * netDepth, 0, -w], [outDir * netDepth, 0, w],
+      goalW / cell, slopeLen / cell
+    )
+    const sideA = triGeom([0, 0, w], [0, postH, w], [outDir * netDepth, 0, w], netDepth / cell, postH / cell)
+    const sideB = triGeom([0, 0, -w], [0, postH, -w], [outDir * netDepth, 0, -w], netDepth / cell, postH / cell)
+    return { back, sideA, sideB }
+  }, [outDir, w, netDepth, postH, slopeLen])
+
+  const netMat = () => (
+    <meshStandardMaterial map={netTex} alphaTest={0.5} side={THREE.DoubleSide} color="#ffffff" roughness={0.9} />
+  )
+
   return (
-    <RigidBody type="fixed" colliders="cuboid" position={[lineX, 0, 0]}>
-      <mesh position={[0, postH / 2, goalW / 2]} castShadow>
-        <boxGeometry args={[0.15, postH, 0.15]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-      <mesh position={[0, postH / 2, -goalW / 2]} castShadow>
-        <boxGeometry args={[0.15, postH, 0.15]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-      <mesh position={[0, postH, 0]} castShadow>
-        <boxGeometry args={[0.15, 0.15, goalW + 0.15]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-    </RigidBody>
+    <>
+      {/* Cadre solide : poteaux + barre transversale */}
+      <RigidBody type="fixed" colliders="cuboid" position={[lineX, 0, 0]}>
+        <mesh position={[0, postH / 2, w]} castShadow>
+          <boxGeometry args={[0.15, postH, 0.15]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[0, postH / 2, -w]} castShadow>
+          <boxGeometry args={[0.15, postH, 0.15]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[0, postH, 0]} castShadow>
+          <boxGeometry args={[0.15, 0.15, goalW + 0.15]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      </RigidBody>
+
+      {/* Filets + barres de fixation au sol (décoratif) */}
+      <group position={[lineX, 0, 0]}>
+        <mesh geometry={geoms.back}>{netMat()}</mesh>
+        <mesh geometry={geoms.sideA}>{netMat()}</mesh>
+        <mesh geometry={geoms.sideB}>{netMat()}</mesh>
+
+        <mesh position={[outDir * netDepth, 0.05, 0]}>
+          <boxGeometry args={[0.12, 0.1, goalW]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[(outDir * netDepth) / 2, 0.05, w]}>
+          <boxGeometry args={[netDepth, 0.1, 0.12]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[(outDir * netDepth) / 2, 0.05, -w]}>
+          <boxGeometry args={[netDepth, 0.1, 0.12]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      </group>
+
+      {/* Filet solide : le joueur et le ballon ne le traversent pas */}
+      <RigidBody type="fixed" colliders={false} position={[lineX, 0, 0]}>
+        <CuboidCollider args={[0.1, postH / 2, w]} position={[outDir * netDepth, postH / 2, 0]} />
+        <CuboidCollider args={[netDepth / 2, postH / 2, 0.1]} position={[(outDir * netDepth) / 2, postH / 2, w]} />
+        <CuboidCollider args={[netDepth / 2, postH / 2, 0.1]} position={[(outDir * netDepth) / 2, postH / 2, -w]} />
+      </RigidBody>
+    </>
   )
 }
 

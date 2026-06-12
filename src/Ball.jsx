@@ -1,11 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 import { RigidBody, BallCollider } from '@react-three/rapier'
+import { ballStore } from './game'
 
 const R = 0.17 // rayon du ballon (~1/4 de la hauteur du personnage)
 
-// Les 12 pentagones noirs, placés aux 12 sommets d'un icosaèdre
-// (positions exactes des pentagons d'un vrai ballon de foot -> motif régulier).
 function useIcoPentagons() {
   return useMemo(() => {
     const phi = (1 + Math.sqrt(5)) / 2
@@ -26,8 +25,19 @@ function useIcoPentagons() {
 
 export default function Ball({ position = [0, R, 0] }) {
   const pentagons = useIcoPentagons()
+  const body = useRef(null)
+
+  // Enregistre le corps du ballon pour que le joueur puisse le frapper
+  useEffect(() => {
+    ballStore.body = body.current
+    return () => {
+      if (ballStore.body === body.current) ballStore.body = null
+    }
+  }, [])
+
   return (
     <RigidBody
+      ref={body}
       colliders={false}
       position={position}
       restitution={0.4}
@@ -37,13 +47,11 @@ export default function Ball({ position = [0, R, 0] }) {
     >
       <BallCollider args={[R]} />
 
-      {/* Base blanche */}
       <mesh castShadow>
         <sphereGeometry args={[R, 32, 32]} />
         <meshStandardMaterial color="#f5f5f5" roughness={0.5} />
       </mesh>
 
-      {/* 12 pentagones noirs répartis uniformément */}
       {pentagons.map((p, i) => (
         <mesh key={i} position={p.pos} quaternion={p.quat}>
           <circleGeometry args={[R * 0.42, 5]} />
