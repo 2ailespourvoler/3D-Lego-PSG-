@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import * as THREE from 'three'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { Instances, Instance } from '@react-three/drei'
@@ -231,6 +231,96 @@ function Walls({ hx, hz }) {
   )
 }
 
+// ----------------------------------------------------------------------------
+// Panneaux publicitaires
+// Déposez vos images dans public/ads/  ->  pub1.png, pub2.png, pub3.png
+// (n'importe quel logo : le ratio est conservé, jamais déformé)
+// ----------------------------------------------------------------------------
+
+function makeAdPlaceholder(color, text) {
+  const w = 512, h = 128
+  const cv = document.createElement('canvas')
+  cv.width = w
+  cv.height = h
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = color
+  ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 48px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, w / 2, h / 2)
+  const tex = new THREE.CanvasTexture(cv)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  return tex
+}
+
+function useAdTexture(url, length, height, color) {
+  const [tex, setTex] = useState(() => {
+    const t = makeAdPlaceholder(color, 'VOTRE PUB')
+    t.repeat.set(Math.max(1, Math.round(length / (height * 4))), 1)
+    return t
+  })
+
+  useEffect(() => {
+    let active = true
+    new THREE.TextureLoader().load(
+      url,
+      (t) => {
+        if (!active) return
+        const aspect = (t.image && t.image.width / t.image.height) || 4
+        const tileW = height * aspect
+        t.wrapS = t.wrapT = THREE.RepeatWrapping
+        t.repeat.set(Math.max(1, Math.round(length / tileW)), 1)
+        t.anisotropy = 8
+        t.colorSpace = THREE.SRGBColorSpace
+        setTex(t)
+      },
+      undefined,
+      () => { /* fichier absent : on garde le placeholder, pas d'erreur */ }
+    )
+    return () => { active = false }
+  }, [url, length, height])
+
+  return tex
+}
+
+function Board({ url, center, length, rotationY, color }) {
+  const height = 1.1
+  const tex = useAdTexture(url, length, height, color)
+  return (
+    <group position={center} rotation={[0, rotationY, 0]}>
+      <mesh position={[0, height / 2 + 0.05, 0]}>
+        <planeGeometry args={[length, height]} />
+        <meshBasicMaterial map={tex} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* socle sombre */}
+      <mesh position={[0, 0.03, -0.03]}>
+        <boxGeometry args={[length, 0.06, 0.08]} />
+        <meshStandardMaterial color="#222222" />
+      </mesh>
+    </group>
+  )
+}
+
+function Ads({ hx, hz }) {
+  const long = hx * 2
+  const endLen = hz * 2
+  // Une marque par côté (les 3 côtés visibles + reprise sur le côté proche)
+  return (
+    <group>
+      {/* Côté lointain (-z) */}
+      <Board url="/ads/pub1.png" center={[0, 0, -(hz + 1)]} length={long} rotationY={0} color="#c2185b" />
+      {/* Côté proche (+z), derrière la caméra */}
+      <Board url="/ads/pub1.png" center={[0, 0, hz + 1]} length={long} rotationY={Math.PI} color="#c2185b" />
+      {/* Bout droit (+x) */}
+      <Board url="/ads/pub2.png" center={[hx + 1, 0, 0]} length={endLen} rotationY={-Math.PI / 2} color="#d32f2f" />
+      {/* Bout gauche (-x) */}
+      <Board url="/ads/pub3.png" center={[-(hx + 1), 0, 0]} length={endLen} rotationY={Math.PI / 2} color="#1565c0" />
+    </group>
+  )
+}
+
 export default function Stadium() {
   const pitchTex = useMemo(makePitchTexture, [])
   const hx = PITCH.hx
@@ -265,6 +355,9 @@ export default function Stadium() {
       {corners.map(([x, z], i) => (
         <CornerFlag key={i} x={x} z={z} dir={x > 0 ? -1 : 1} />
       ))}
+
+      {/* Panneaux publicitaires */}
+      <Ads hx={hx} hz={hz} />
 
       {/* Gradins */}
       {steps.map((s, i) => (
