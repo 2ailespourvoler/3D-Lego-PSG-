@@ -4,11 +4,12 @@ import { Physics, RigidBody } from '@react-three/rapier'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
+import Goalkeeper from './Goalkeeper'
 import Ball from './Ball'
 import Stadium from './Stadium'
 import CharacterSelect from './CharacterSelect'
 import { CHARACTERS } from './characters'
-import { input1, input2 } from './input'
+import { input1, input2, aiInput } from './input'
 import { playerPos, playerPos2, ballStore, GOAL, PITCH } from './game'
 import { playCheer, primeAudio } from './sound'
 
@@ -79,6 +80,40 @@ function BallWatcher({ active }) {
   return null
 }
 
+// IA de champ : court derrière le ballon et le pousse vers le but adverse (-x)
+function AIController({ active }) {
+  const last = useRef(0)
+  useFrame(() => {
+    if (!active) { aiInput.x = 0; aiInput.z = 0; return }
+    const ball = ballStore.body
+    if (!ball) return
+    const b = ball.translation()
+    const self = playerPos2
+    const goalX = -GOAL.lineX
+    const gdx = goalX - b.x
+    const gdz = 0 - b.z
+    const gl = Math.hypot(gdx, gdz) || 1
+    const ux = gdx / gl, uz = gdz / gl
+    // point d'approche : derrière le ballon, côté opposé au but visé
+    const apx = b.x - ux * 0.85
+    const apz = b.z - uz * 0.85
+    const mx = apx - self.x, mz = apz - self.z
+    const md = Math.hypot(mx, mz) || 1
+    aiInput.x = mx / md
+    aiInput.z = mz / md
+    // frappe si proche du ballon et bien aligné vers le but
+    const bdx = b.x - self.x, bdz = b.z - self.z
+    const bd = Math.hypot(bdx, bdz)
+    const align = (bdx / (bd || 1)) * ux + (bdz / (bd || 1)) * uz
+    const now = performance.now()
+    if (bd < 1.5 && align > 0.3 && now - last.current > 500) {
+      aiInput.kickRequested = true
+      last.current = now
+    }
+  })
+  return null
+}
+
 function fmt(s) {
   const m = Math.floor(s / 60)
   const r = Math.floor(s % 60)
@@ -87,10 +122,13 @@ function fmt(s) {
 
 export default function App() {
   const [mode, setMode] = useState('duel')
+  const [opp, setOpp] = useState('friend')        // 'friend' | 'ai' (duel uniquement)
   const [phase, setPhase] = useState('menu')      // 'menu' | 'select' | 'playing' | 'over'
   const [selectStep, setSelectStep] = useState('p1')
   const [pick1, setPick1] = useState(CHARACTERS[0].id)
   const [pick2, setPick2] = useState(CHARACTERS[0].id)
+  const [keeper1, setKeeper1] = useState(CHARACTERS[0].id)
+  const [keeper2, setKeeper2] = useState(CHARACTERS[0].id)
   const [s1, setS1] = useState(0)
   const [s2, setS2] = useState(0)
   const [time, setTime] = useState(MATCH_TIME)
@@ -101,9 +139,10 @@ export default function App() {
   const r2 = useRef(0)
   const goalTimer = useRef(null)
 
-  function chooseMode(m) {
+  function chooseMode(m, opponent = 'friend') {
     primeAudio()
     setMode(m)
+    setOpp(opponent)
     setSelectStep('p1')
     setPhase('select')
   }
@@ -118,12 +157,15 @@ export default function App() {
 
   function handlePick(id) {
     if (selectStep === 'p1') {
-      setPick1(id)
+      setPick1(id); setSelectStep('g1')
+    } else if (selectStep === 'g1') {
+      setKeeper1(id)
       if (mode === 'duel') setSelectStep('p2')
       else startMatch()
+    } else if (selectStep === 'p2') {
+      setPick2(id); setSelectStep('g2')
     } else {
-      setPick2(id)
-      startMatch()
+      setKeeper2(id); startMatch()
     }
   }
 
@@ -156,6 +198,8 @@ export default function App() {
   const half = PITCH.hx * 0.4
   const c1 = charById(pick1)
   const c2 = charById(pick2)
+  const gk1 = charById(keeper1)
+  const gk2 = charById(keeper2)
 
   return (
     <>
@@ -197,13 +241,57 @@ export default function App() {
                 <Suspense fallback={null}>
                   <Player
                     key={`p2-${token}`}
-                    source={input2}
+                    source={opp === 'ai' ? aiInput : input2}
                     modelUrl={c2.url}
                     modelScale={c2.scale}
                     modelFacing={c2.facing}
                     spawn={[half, 1, 0]}
                     markerColor="#e8412c"
                     posTarget={playerPos2}
+                    frozen={frozen}
+                  />
+                </Suspense>
+              )}
+
+              {mode === 'duel' && opp === 'ai' && (
+                <AIController active={!frozen} />
+              )}
+
+              {/* Gardiens (IA, verrouillés sur leur ligne) */}
+              {mode === 'duel' ? (
+                <>
+                  <Suspense fallback={null}>
+                    <Goalkeeper
+                      key={`gk1-${token}`}
+                      modelUrl={gk1.url}
+                      modelScale={gk1.scale}
+                      modelFacing={gk1.facing}
+                      side={-1}
+                      markerColor="#2b6cff"
+                      frozen={frozen}
+                    />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <Goalkeeper
+                      key={`gk2-${token}`}
+                      modelUrl={gk2.url}
+                      modelScale={gk2.scale}
+                      modelFacing={gk2.facing}
+                      side={1}
+                      markerColor="#e8412c"
+                      frozen={frozen}
+                    />
+                  </Suspense>
+                </>
+              ) : (
+                <Suspense fallback={null}>
+                  <Goalkeeper
+                    key={`gk1-${token}`}
+                    modelUrl={gk1.url}
+                    modelScale={gk1.scale}
+                    modelFacing={gk1.facing}
+                    side={1}
+                    markerColor="#e8412c"
                     frozen={frozen}
                   />
                 </Suspense>
@@ -220,7 +308,7 @@ export default function App() {
         <div className="hud">
           {mode === 'duel' ? (
             <div className="hud-pill score">
-              <span className="t1">Bleu</span> {s1} <span className="sep">-</span> {s2} <span className="t2">Rouge</span>
+              <span className="t1">Bleu</span> {s1} <span className="sep">-</span> {s2} <span className="t2">{opp === 'ai' ? 'IA' : 'Rouge'}</span>
             </div>
           ) : (
             <div className="hud-pill">⚽ Buts : {s1}</div>
@@ -240,7 +328,8 @@ export default function App() {
           <div className="panel">
             <h1>⚽ Foot Lego</h1>
             <button onClick={() => chooseMode('solo')}>Solo (entraînement)</button>
-            <button onClick={() => chooseMode('duel')}>Duel — 2 joueurs</button>
+            <button onClick={() => chooseMode('duel', 'friend')}>Duel — contre un ami</button>
+            <button onClick={() => chooseMode('duel', 'ai')}>Duel — contre l'IA</button>
             <p className="hint-controls">
               J1 : flèches + Entrée (ou manette + A)<br />
               J2 : ZQSD/WASD + Espace
@@ -253,10 +342,14 @@ export default function App() {
         <CharacterSelect
           title={
             selectStep === 'p1'
-              ? (mode === 'duel' ? 'Joueur Bleu : choisis ton personnage' : 'Choisis ton personnage')
-              : 'Joueur Rouge : choisis ton personnage'
+              ? (mode === 'duel' ? 'Joueur Bleu : choisis ton joueur' : 'Choisis ton joueur')
+              : selectStep === 'g1'
+              ? (mode === 'duel' ? 'Joueur Bleu : choisis ton gardien' : 'Choisis ton gardien')
+              : selectStep === 'p2'
+              ? (opp === 'ai' ? 'Adversaire IA : choisis son joueur' : 'Joueur Rouge : choisis ton joueur')
+              : (opp === 'ai' ? 'Adversaire IA : choisis son gardien' : 'Joueur Rouge : choisis ton gardien')
           }
-          color={selectStep === 'p1' ? '#5b9bff' : '#ff6a55'}
+          color={selectStep === 'p1' || selectStep === 'g1' ? '#5b9bff' : '#ff6a55'}
           onPick={handlePick}
         />
       )}
@@ -266,7 +359,7 @@ export default function App() {
           <div className="panel">
             {mode === 'duel' ? (
               <>
-                <h1>{s1 > s2 ? 'Joueur Bleu gagne ! 🎉' : s2 > s1 ? 'Joueur Rouge gagne ! 🎉' : 'Match nul'}</h1>
+                <h1>{s1 > s2 ? 'Joueur Bleu gagne ! 🎉' : s2 > s1 ? (opp === 'ai' ? "L'IA gagne ! 🤖" : 'Joueur Rouge gagne ! 🎉') : 'Match nul'}</h1>
                 <p className="result">{s1} - {s2}</p>
               </>
             ) : (

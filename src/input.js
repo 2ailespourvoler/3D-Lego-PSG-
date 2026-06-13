@@ -1,6 +1,7 @@
 // Deux jeux d'entrées : joueur 1 (flèches + manette) et joueur 2 (ZQSD/WASD).
 export const input1 = { x: 0, z: 0, kickRequested: false } // J1 : flèches + manette, frappe = Entrée / bouton A
 export const input2 = { x: 0, z: 0, kickRequested: false } // J2 : ZQSD/WASD, frappe = Espace
+export const aiInput = { x: 0, z: 0, kickRequested: false } // adversaire piloté par l'IA
 
 const keys = {}
 const DEADZONE = 0.2
