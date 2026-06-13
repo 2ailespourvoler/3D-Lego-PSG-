@@ -5,6 +5,7 @@ import { useGLTF, useAnimations } from '@react-three/drei'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import * as THREE from 'three'
 import { ballStore } from './game'
+import { playKick } from './sound'
 
 const SPEED = 5
 const ANIM_SPEED = 1.2
@@ -99,6 +100,7 @@ export default function Player({
           const d = Math.hypot(dx, dz)
           if (d < KICK_RANGE) {
             ball.applyImpulse({ x: (dx / (d || 1)) * KICK_POWER, y: KICK_UP, z: (dz / (d || 1)) * KICK_POWER }, true)
+            playKick()
           }
         }
       }
@@ -131,9 +133,10 @@ export default function Player({
   return (
     <RigidBody ref={body} colliders={false} mass={1} lockRotations position={spawn}>
       <CuboidCollider args={[0.5, 0.5, 0.5]} />
-      <mesh position={[0, -0.48, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Marqueur d'équipe au sol (au-dessus de la pelouse) */}
+      <mesh position={[0, -0.38, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.55, 0.78, 28]} />
-        <meshBasicMaterial color={markerColor} side={THREE.DoubleSide} transparent opacity={0.9} />
+        <meshBasicMaterial color={markerColor} side={THREE.DoubleSide} transparent opacity={0.9} depthWrite={false} />
       </mesh>
       <group ref={visual}>
         <primitive object={model} scale={modelScale} position={[0, groundY, 0]} />

@@ -10,6 +10,7 @@ import CharacterSelect from './CharacterSelect'
 import { CHARACTERS } from './characters'
 import { input1, input2 } from './input'
 import { playerPos, playerPos2, ballStore, GOAL, PITCH } from './game'
+import { playCheer, primeAudio } from './sound'
 
 const MATCH_TIME = 120
 
@@ -32,8 +33,8 @@ function CameraRig({ mode }) {
       const midX = (playerPos.x + playerPos2.x) / 2
       const midZ = (playerPos.z + playerPos2.z) / 2
       const spread = Math.hypot(playerPos.x - playerPos2.x, playerPos.z - playerPos2.z)
-      const height = THREE.MathUtils.clamp(13 + spread * 0.55, 15, 30)
-      const back = THREE.MathUtils.clamp(11 + spread * 0.5, 13, 26)
+      const height = THREE.MathUtils.clamp(8 + spread * 0.55, 10, 28)
+      const back = THREE.MathUtils.clamp(9 + spread * 0.5, 11, 24)
       lookTarget.current.set(midX, 1, midZ)
       desired.current.set(midX, height, midZ + back)
     }
@@ -101,6 +102,7 @@ export default function App() {
   const goalTimer = useRef(null)
 
   function chooseMode(m) {
+    primeAudio()
     setMode(m)
     setSelectStep('p1')
     setPhase('select')
@@ -141,6 +143,7 @@ export default function App() {
   function handleGoal(team) {
     if (team === 1) { r1.current += 1; setS1(r1.current) }
     else { r2.current += 1; setS2(r2.current) }
+    playCheer()
     setGoalBy(team)
     setToken((t) => t + 1)
     if (goalTimer.current) clearTimeout(goalTimer.current)

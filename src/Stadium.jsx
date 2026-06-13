@@ -303,20 +303,47 @@ function Board({ url, center, length, rotationY, color }) {
   )
 }
 
+const AD_IMAGES = [
+  '/ads/pub1.png', '/ads/pub2.png', '/ads/pub3.png', '/ads/pub4.png', '/ads/pub5.png',
+  // ajoutez '/ads/pub6.png', etc. si vous avez plus d'images
+]
+const AD_COLORS = ['#c2185b', '#d32f2f', '#1565c0', '#6a1b9a', '#00897b', '#ef6c00']
+
+function shuffle(arr) {
+  const r = arr.slice()
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = r[i]; r[i] = r[j]; r[j] = tmp
+  }
+  return r
+}
+
 function Ads({ hx, hz }) {
   const long = hx * 2
+  const half = long / 2
   const endLen = hz * 2
-  // Une marque par côté (les 3 côtés visibles + reprise sur le côté proche)
+  // 6 emplacements : 2 sur chaque grand côté, 1 sur chaque bout
+  const slots = [
+    { center: [-half / 2, 0, -(hz + 1)], length: half, rotationY: 0 },
+    { center: [half / 2, 0, -(hz + 1)], length: half, rotationY: 0 },
+    { center: [-half / 2, 0, hz + 1], length: half, rotationY: Math.PI },
+    { center: [half / 2, 0, hz + 1], length: half, rotationY: Math.PI },
+    { center: [hx + 1, 0, 0], length: endLen, rotationY: -Math.PI / 2 },
+    { center: [-(hx + 1), 0, 0], length: endLen, rotationY: Math.PI / 2 },
+  ]
+  // Assignation aléatoire des pubs (varie à chaque chargement)
+  const assign = useMemo(() => {
+    const imgs = shuffle(AD_IMAGES)
+    const cols = shuffle(AD_COLORS)
+    return slots.map((s, i) => ({ ...s, url: imgs[i % imgs.length], color: cols[i % cols.length] }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <group>
-      {/* Côté lointain (-z) */}
-      <Board url="/ads/pub1.png" center={[0, 0, -(hz + 1)]} length={long} rotationY={0} color="#c2185b" />
-      {/* Côté proche (+z), derrière la caméra */}
-      <Board url="/ads/pub4.png" center={[0, 0, hz + 1]} length={long} rotationY={Math.PI} color="#6a1b9a" />
-      {/* Bout droit (+x) */}
-      <Board url="/ads/pub2.png" center={[hx + 1, 0, 0]} length={endLen} rotationY={-Math.PI / 2} color="#d32f2f" />
-      {/* Bout gauche (-x) */}
-      <Board url="/ads/pub3.png" center={[-(hx + 1), 0, 0]} length={endLen} rotationY={Math.PI / 2} color="#1565c0" />
+      {assign.map((s, i) => (
+        <Board key={i} url={s.url} center={s.center} length={s.length} rotationY={s.rotationY} color={s.color} />
+      ))}
     </group>
   )
 }
