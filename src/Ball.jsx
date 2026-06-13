@@ -39,6 +39,7 @@ export default function Ball({ position = [0, R, 0] }) {
     <RigidBody
       ref={body}
       colliders={false}
+      ccd
       position={position}
       restitution={0.4}
       friction={0.7}

@@ -185,9 +185,9 @@ function Goal({ lineX }) {
 
       {/* Filet solide : le joueur et le ballon ne le traversent pas */}
       <RigidBody type="fixed" colliders={false} position={[lineX, 0, 0]}>
-        <CuboidCollider args={[0.1, postH / 2, w]} position={[outDir * netDepth, postH / 2, 0]} />
-        <CuboidCollider args={[netDepth / 2, postH / 2, 0.1]} position={[(outDir * netDepth) / 2, postH / 2, w]} />
-        <CuboidCollider args={[netDepth / 2, postH / 2, 0.1]} position={[(outDir * netDepth) / 2, postH / 2, -w]} />
+        <CuboidCollider args={[0.12, postH / 2, w]} position={[outDir * netDepth, postH / 2, 0]} restitution={0} restitutionCombineRule={1} />
+        <CuboidCollider args={[netDepth / 2, postH / 2, 0.12]} position={[(outDir * netDepth) / 2, postH / 2, w]} restitution={0} restitutionCombineRule={1} />
+        <CuboidCollider args={[netDepth / 2, postH / 2, 0.12]} position={[(outDir * netDepth) / 2, postH / 2, -w]} restitution={0} restitutionCombineRule={1} />
       </RigidBody>
     </>
   )

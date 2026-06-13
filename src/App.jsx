@@ -62,6 +62,22 @@ function GoalSensor({ active, onGoal }) {
   return null
 }
 
+// Replace le ballon au centre s'il sort du terrain (tribunes, etc.)
+function BallWatcher({ active }) {
+  useFrame(() => {
+    if (!active) return
+    const ball = ballStore.body
+    if (!ball) return
+    const t = ball.translation()
+    if (Math.abs(t.x) > PITCH.hx + 2.5 || Math.abs(t.z) > PITCH.hz + 2.5 || t.y < -2 || t.y > 9) {
+      ball.setTranslation({ x: 0, y: 0.3, z: 0 }, true)
+      ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      ball.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    }
+  })
+  return null
+}
+
 function fmt(s) {
   const m = Math.floor(s / 60)
   const r = Math.floor(s % 60)
@@ -191,6 +207,7 @@ export default function App() {
               )}
 
               <GoalSensor active={!frozen} onGoal={handleGoal} />
+              <BallWatcher active={!frozen} />
             </>
           )}
         </Physics>

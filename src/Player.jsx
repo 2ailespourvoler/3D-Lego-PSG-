@@ -10,7 +10,7 @@ const SPEED = 5
 const ANIM_SPEED = 1.2
 const KICK_SPEED = 1.3
 const KICK_RANGE = 1.8
-const KICK_POWER = 0.5
+const KICK_POWER = 0.4   // -20% (était 0.5)
 const KICK_UP = 0.12
 
 export default function Player({
