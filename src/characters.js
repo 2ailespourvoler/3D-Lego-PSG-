@@ -3,7 +3,6 @@
 // puis ajoutez une ligne ici. La grille de sélection se met à jour toute seule.
 export const CHARACTERS = [
     { id: 'lego', name: 'Footballeur Lego', url: '/personnage.glb', scale: 0.7, facing: 0 },
-    // { id: 'playmobil', name: 'Playmobil', url: '/perso_playmobil.glb', scale: 0.7, facing: 0 },
-    // { id: 'humain',    name: 'Humain',    url: '/perso_humain.glb',    scale: 0.7, facing: 0 },
+    { id: 'panthere', name: 'Panthère rose', url: '/perso_panthere.glb', scale: 0.78, facing: 0 },
   ]
   
