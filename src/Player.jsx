@@ -7,9 +7,6 @@ import * as THREE from 'three'
 import { playerPos, ballStore } from './game'
 
 const SPEED = 5
-const MODEL_URL = '/personnage.glb'
-const MODEL_SCALE = 0.7
-const MODEL_FACING = 0
 const ANIM_SPEED = 1.2
 const KICK_SPEED = 1.3
 const KICK_RANGE = 1.8
@@ -18,6 +15,9 @@ const KICK_UP = 0.12
 
 export default function Player({
   source,
+  modelUrl = '/personnage.glb',
+  modelScale = 0.7,
+  modelFacing = 0,
   spawn = [-2.5, 1, 0],
   markerColor = '#2b6cff',
   reportPos = false,
@@ -29,8 +29,7 @@ export default function Player({
   const kicking = useRef(false)
   const kickEnd = useRef(0)
 
-  const { scene, animations } = useGLTF(MODEL_URL)
-  // Cloner la scène : indispensable pour afficher plusieurs personnages animés
+  const { scene, animations } = useGLTF(modelUrl)
   const model = useMemo(() => cloneSkeleton(scene), [scene])
   const { actions, names } = useAnimations(animations, visual)
 
@@ -49,8 +48,8 @@ export default function Player({
 
   const groundY = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene)
-    return -0.5 - MODEL_SCALE * box.min.y
-  }, [scene])
+    return -0.5 - modelScale * box.min.y
+  }, [scene, modelScale])
 
   const move = new THREE.Vector3()
 
@@ -68,7 +67,7 @@ export default function Player({
     body.current.setLinvel({ x: move.x * SPEED, y: vel.y, z: move.z * SPEED }, true)
 
     if (visual.current && moving) {
-      const targetAngle = Math.atan2(move.x, move.z) + MODEL_FACING
+      const targetAngle = Math.atan2(move.x, move.z) + modelFacing
       const cur = visual.current.rotation.y
       let diff = targetAngle - cur
       diff = Math.atan2(Math.sin(diff), Math.cos(diff))
@@ -78,7 +77,6 @@ export default function Player({
     const runAction = runName && actions ? actions[runName] : null
     const kickAction = kickName && actions ? actions[kickName] : null
 
-    // Coup de pied
     if (source.kickRequested) {
       source.kickRequested = false
       if (!frozen && kickAction) {
@@ -91,7 +89,6 @@ export default function Player({
         kicking.current = true
         kickEnd.current = now + kickAction.getClip().duration / KICK_SPEED
       }
-      // Propulser le ballon s'il est à portée
       if (!frozen) {
         const ball = ballStore.body
         const p = body.current.translation()
@@ -134,16 +131,13 @@ export default function Player({
   return (
     <RigidBody ref={body} colliders={false} mass={1} lockRotations position={spawn}>
       <CuboidCollider args={[0.5, 0.5, 0.5]} />
-      {/* Marqueur d'équipe au sol */}
       <mesh position={[0, -0.48, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.55, 0.78, 28]} />
         <meshBasicMaterial color={markerColor} side={THREE.DoubleSide} transparent opacity={0.9} />
       </mesh>
       <group ref={visual}>
-        <primitive object={model} scale={MODEL_SCALE} position={[0, groundY, 0]} />
+        <primitive object={model} scale={modelScale} position={[0, groundY, 0]} />
       </group>
     </RigidBody>
   )
 }
-
-useGLTF.preload(MODEL_URL)

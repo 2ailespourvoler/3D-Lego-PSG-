@@ -1,16 +1,22 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Physics, RigidBody } from '@react-three/rapier'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
 import Ball from './Ball'
 import Stadium from './Stadium'
+import CharacterSelect from './CharacterSelect'
+import { CHARACTERS } from './characters'
 import { input1, input2 } from './input'
 import { playerPos, ballStore, GOAL, PITCH } from './game'
 
-const MATCH_TIME = 120 // secondes (2 min)
+const MATCH_TIME = 120
 
-// Caméra : suit le joueur en Solo, vue large fixe en Duel
+// Précharger tous les personnages
+CHARACTERS.forEach((c) => useGLTF.preload(c.url))
+const charById = (id) => CHARACTERS.find((c) => c.id === id) || CHARACTERS[0]
+
 function CameraRig({ mode }) {
   const target = useRef(new THREE.Vector3())
   const desired = useRef(new THREE.Vector3())
@@ -29,7 +35,6 @@ function CameraRig({ mode }) {
   return null
 }
 
-// Détecte un but : le ballon franchit la ligne dans la largeur de la cage
 function GoalSensor({ active, onGoal }) {
   const last = useRef(0)
   useFrame(() => {
@@ -40,8 +45,8 @@ function GoalSensor({ active, onGoal }) {
     if (now - last.current < 2000) return
     const t = ball.translation()
     if (Math.abs(t.z) < GOAL.width / 2 - 0.2 && t.y < 2.3) {
-      if (t.x > GOAL.lineX + 0.2) { last.current = now; onGoal(1) }       // cage +x : J1 marque
-      else if (t.x < -GOAL.lineX - 0.2) { last.current = now; onGoal(2) }  // cage -x : J2 marque
+      if (t.x > GOAL.lineX + 0.2) { last.current = now; onGoal(1) }
+      else if (t.x < -GOAL.lineX - 0.2) { last.current = now; onGoal(2) }
     }
   })
   return null
@@ -54,20 +59,28 @@ function fmt(s) {
 }
 
 export default function App() {
-  const [mode, setMode] = useState('duel')      // 'solo' | 'duel'
-  const [phase, setPhase] = useState('menu')     // 'menu' | 'playing' | 'over'
+  const [mode, setMode] = useState('duel')
+  const [phase, setPhase] = useState('menu')      // 'menu' | 'select' | 'playing' | 'over'
+  const [selectStep, setSelectStep] = useState('p1')
+  const [pick1, setPick1] = useState(CHARACTERS[0].id)
+  const [pick2, setPick2] = useState(CHARACTERS[0].id)
   const [s1, setS1] = useState(0)
   const [s2, setS2] = useState(0)
   const [time, setTime] = useState(MATCH_TIME)
-  const [goalBy, setGoalBy] = useState(null)     // null | 1 | 2  (fenêtre "BUT !")
-  const [token, setToken] = useState(0)          // change -> replace ballon + joueurs
+  const [goalBy, setGoalBy] = useState(null)
+  const [token, setToken] = useState(0)
 
   const r1 = useRef(0)
   const r2 = useRef(0)
   const goalTimer = useRef(null)
 
-  function startGame(m) {
+  function chooseMode(m) {
     setMode(m)
+    setSelectStep('p1')
+    setPhase('select')
+  }
+
+  function startMatch() {
     setS1(0); setS2(0); r1.current = 0; r2.current = 0
     setTime(MATCH_TIME)
     setGoalBy(null)
@@ -75,7 +88,17 @@ export default function App() {
     setPhase('playing')
   }
 
-  // Chrono (en pause pendant la fenêtre "BUT !")
+  function handlePick(id) {
+    if (selectStep === 'p1') {
+      setPick1(id)
+      if (mode === 'duel') setSelectStep('p2')
+      else startMatch()
+    } else {
+      setPick2(id)
+      startMatch()
+    }
+  }
+
   useEffect(() => {
     if (phase !== 'playing') return
     const id = setInterval(() => {
@@ -93,7 +116,7 @@ export default function App() {
     if (team === 1) { r1.current += 1; setS1(r1.current) }
     else { r2.current += 1; setS2(r2.current) }
     setGoalBy(team)
-    setToken((t) => t + 1) // ballon au centre, joueurs replacés
+    setToken((t) => t + 1)
     if (goalTimer.current) clearTimeout(goalTimer.current)
     goalTimer.current = setTimeout(() => setGoalBy(null), 1800)
   }
@@ -102,6 +125,8 @@ export default function App() {
 
   const frozen = goalBy !== null
   const half = PITCH.hx * 0.4
+  const c1 = charById(pick1)
+  const c2 = charById(pick2)
 
   return (
     <>
@@ -129,6 +154,9 @@ export default function App() {
                 <Player
                   key={`p1-${token}`}
                   source={input1}
+                  modelUrl={c1.url}
+                  modelScale={c1.scale}
+                  modelFacing={c1.facing}
                   spawn={mode === 'solo' ? [-2.5, 1, 0] : [-half, 1, 0]}
                   markerColor="#2b6cff"
                   reportPos
@@ -141,6 +169,9 @@ export default function App() {
                   <Player
                     key={`p2-${token}`}
                     source={input2}
+                    modelUrl={c2.url}
+                    modelScale={c2.scale}
+                    modelFacing={c2.facing}
                     spawn={[half, 1, 0]}
                     markerColor="#e8412c"
                     frozen={frozen}
@@ -154,7 +185,6 @@ export default function App() {
         </Physics>
       </Canvas>
 
-      {/* Tableau d'affichage */}
       {phase === 'playing' && (
         <div className="hud">
           {mode === 'duel' ? (
@@ -168,20 +198,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Fenêtre "BUT !" */}
       {phase === 'playing' && goalBy && (
         <div className="goal-flash">
           <div className={goalBy === 1 ? 'goal-text t1' : 'goal-text t2'}>BUT !</div>
         </div>
       )}
 
-      {/* Menu */}
       {phase === 'menu' && (
         <div className="overlay">
           <div className="panel">
             <h1>⚽ Foot Lego</h1>
-            <button onClick={() => startGame('solo')}>Solo (entraînement)</button>
-            <button onClick={() => startGame('duel')}>Duel — 2 joueurs</button>
+            <button onClick={() => chooseMode('solo')}>Solo (entraînement)</button>
+            <button onClick={() => chooseMode('duel')}>Duel — 2 joueurs</button>
             <p className="hint-controls">
               J1 : flèches + Entrée (ou manette + A)<br />
               J2 : ZQSD/WASD + Espace
@@ -190,7 +218,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Fin de match */}
+      {phase === 'select' && (
+        <CharacterSelect
+          title={
+            selectStep === 'p1'
+              ? (mode === 'duel' ? 'Joueur Bleu : choisis ton personnage' : 'Choisis ton personnage')
+              : 'Joueur Rouge : choisis ton personnage'
+          }
+          color={selectStep === 'p1' ? '#5b9bff' : '#ff6a55'}
+          onPick={handlePick}
+        />
+      )}
+
       {phase === 'over' && (
         <div className="overlay">
           <div className="panel">
