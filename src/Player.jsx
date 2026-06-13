@@ -4,7 +4,7 @@ import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import * as THREE from 'three'
-import { playerPos, ballStore } from './game'
+import { ballStore } from './game'
 
 const SPEED = 5
 const ANIM_SPEED = 1.2
@@ -20,7 +20,7 @@ export default function Player({
   modelFacing = 0,
   spawn = [-2.5, 1, 0],
   markerColor = '#2b6cff',
-  reportPos = false,
+  posTarget = null,
   frozen = false,
 }) {
   const body = useRef(null)
@@ -120,11 +120,11 @@ export default function Player({
       }
     }
 
-    if (reportPos) {
+    if (posTarget) {
       const p = body.current.translation()
-      playerPos.x = p.x
-      playerPos.y = p.y
-      playerPos.z = p.z
+      posTarget.x = p.x
+      posTarget.y = p.y
+      posTarget.z = p.z
     }
   })
 

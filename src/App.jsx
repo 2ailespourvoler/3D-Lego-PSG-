@@ -9,7 +9,7 @@ import Stadium from './Stadium'
 import CharacterSelect from './CharacterSelect'
 import { CHARACTERS } from './characters'
 import { input1, input2 } from './input'
-import { playerPos, ballStore, GOAL, PITCH } from './game'
+import { playerPos, playerPos2, ballStore, GOAL, PITCH } from './game'
 
 const MATCH_TIME = 120
 
@@ -17,20 +17,30 @@ const MATCH_TIME = 120
 CHARACTERS.forEach((c) => useGLTF.preload(c.url))
 const charById = (id) => CHARACTERS.find((c) => c.id === id) || CHARACTERS[0]
 
+const SOLO_OFFSET = new THREE.Vector3(0, 6, 10)
+
 function CameraRig({ mode }) {
-  const target = useRef(new THREE.Vector3())
-  const desired = useRef(new THREE.Vector3())
+  const desired = useRef(new THREE.Vector3(0, 31, 33))
+  const lookTarget = useRef(new THREE.Vector3())
+  const look = useRef(new THREE.Vector3())
   useFrame((state, delta) => {
     if (mode === 'solo') {
-      target.current.set(playerPos.x, playerPos.y, playerPos.z)
-      desired.current.copy(target.current).add(new THREE.Vector3(0, 6, 10))
+      lookTarget.current.set(playerPos.x, 0, playerPos.z)
+      desired.current.copy(lookTarget.current).add(SOLO_OFFSET)
     } else {
-      desired.current.set(0, 31, 33)
-      target.current.set(0, 0, 0)
+      // Suit le milieu des deux joueurs, et dézoome quand ils s'éloignent
+      const midX = (playerPos.x + playerPos2.x) / 2
+      const midZ = (playerPos.z + playerPos2.z) / 2
+      const spread = Math.hypot(playerPos.x - playerPos2.x, playerPos.z - playerPos2.z)
+      const height = THREE.MathUtils.clamp(13 + spread * 0.55, 15, 30)
+      const back = THREE.MathUtils.clamp(11 + spread * 0.5, 13, 26)
+      lookTarget.current.set(midX, 1, midZ)
+      desired.current.set(midX, height, midZ + back)
     }
     const s = 1 - Math.pow(0.0015, delta)
     state.camera.position.lerp(desired.current, s)
-    state.camera.lookAt(target.current)
+    look.current.lerp(lookTarget.current, s)
+    state.camera.lookAt(look.current)
   })
   return null
 }
@@ -159,7 +169,7 @@ export default function App() {
                   modelFacing={c1.facing}
                   spawn={mode === 'solo' ? [-2.5, 1, 0] : [-half, 1, 0]}
                   markerColor="#2b6cff"
-                  reportPos
+                  posTarget={playerPos}
                   frozen={frozen}
                 />
               </Suspense>
@@ -174,6 +184,7 @@ export default function App() {
                     modelFacing={c2.facing}
                     spawn={[half, 1, 0]}
                     markerColor="#e8412c"
+                    posTarget={playerPos2}
                     frozen={frozen}
                   />
                 </Suspense>

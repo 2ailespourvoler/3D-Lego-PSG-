@@ -9,8 +9,9 @@ export const GOAL = {
   height: 2.4,
 }
 
-// Position du joueur 1 (suivi caméra en mode Solo)
+// Position des joueurs (pour la caméra)
 export const playerPos = { x: 0, y: 0, z: 0 }
+export const playerPos2 = { x: 0, y: 0, z: 0 }
 
 // Corps physique du ballon (pour le frapper)
 export const ballStore = { body: null }
